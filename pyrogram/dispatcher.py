@@ -434,10 +434,16 @@ class Dispatcher:
 
     def add_handler(self, handler: Handler[Any], group: int) -> None:
         with self._groups_lock:
-            groups = self._copy_groups()
-            groups.setdefault(group, []).append(handler)
+            # Only the changed group gets a new list; the others are shared with the old mapping,
+            #  which is fine since no writer mutates a list it did not copy. A new group is the
+            #  only case that can break the key order, so only then are the keys reordered.
+            groups = self.groups
 
-            self.groups = dict(sorted(groups.items()))
+            if group in groups:
+                self.groups = {**groups, group: [*groups[group], handler]}
+            else:
+                # Sorting raises the `TypeError` for a non-comparable group before the rebind.
+                self.groups = dict(sorted({**groups, group: [handler]}.items()))
 
     def remove_handler(self, handler: Handler[Any], group: int) -> None:
         with self._groups_lock:
