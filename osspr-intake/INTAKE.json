@@ -1,0 +1,40 @@
+{
+  "targets": [
+    {
+      "upstream_repo": "kurigram-org/kurigram",
+      "head_sha": "3d60f316a3eb06286ac38e56cd5664dd648d5196",
+      "file": "pyrogram/file_id.py",
+      "function": "rle_encode",
+      "native_test_cmd": "python -m pytest tests/unit/test_file_id.py",
+      "bench_cmd": "python osspr-intake/harness/rle-encode/bench.py",
+      "baseline_median_ms": 32.6777,
+      "baseline_noise_pct": 1.077,
+      "tests_pass_on_baseline": true,
+      "notes": "FileId.encode and FileUniqueId.encode run every outgoing file id through rle_encode. On the real file-id and file-unique-id bodies from the unit tests, cProfile puts about 57% of the time in rle_encode itself and about 38% in list.append and list.extend, which the loop calls once per byte or per zero run. Each input byte becomes a Python int on a list, a zero run is stored as the pair (0, count), and bytes() then walks that list. These payloads are short and padded with zeros, so the int list is the whole cost. Writing runs straight into a bytearray keeps the same bytes and drops the per-byte objects."
+    },
+    {
+      "upstream_repo": "kurigram-org/kurigram",
+      "head_sha": "3d60f316a3eb06286ac38e56cd5664dd648d5196",
+      "file": "pyrogram/file_id.py",
+      "function": "rle_decode",
+      "native_test_cmd": "python -m pytest tests/unit/test_file_id.py",
+      "bench_cmd": "python osspr-intake/harness/rle-decode/bench.py",
+      "baseline_median_ms": 29.0502,
+      "baseline_noise_pct": 0.993,
+      "tests_pass_on_baseline": true,
+      "notes": "FileId.decode and FileUniqueId.decode pass the base64-decoded file id straight to rle_decode. cProfile on those same bodies puts about 56% of the time in rle_decode and about 39% in list.append and list.extend. A zero marker makes the next byte a run length, and that run is expanded with extend of a fresh tuple of zeros; every other byte is appended as its own int before bytes() copies the list. The file-id bodies are mostly those zero runs. Filling a bytearray, with one slice per zero run, returns the same bytes without the int list."
+    },
+    {
+      "upstream_repo": "kurigram-org/kurigram",
+      "head_sha": "3d60f316a3eb06286ac38e56cd5664dd648d5196",
+      "file": "pyrogram/raw/core/primitives/bytes.py",
+      "function": "Bytes.read",
+      "native_test_cmd": "python -m pytest tests/unit/test_file_id.py",
+      "bench_cmd": "python osspr-intake/harness/bytes-read/bench.py",
+      "baseline_median_ms": 48.1449,
+      "baseline_noise_pct": 1.449,
+      "tests_pass_on_baseline": true,
+      "notes": "Every incoming TL string and bytes field, including the file reference inside a file id, is read by Bytes.read. On a mix of short usernames, file references, captions, and message bodies on both sides of the 253-byte length cutoff, cProfile puts about 58% of Bytes.read's time in the method, about a third in three separate BytesIO.read calls (the length, the payload, and the padding), and the rest in int.from_bytes on the length. The padding width is fixed by the payload length, so one read of the whole framed slice returns the same bytes and leaves the buffer at the same offset."
+    }
+  ]
+}
