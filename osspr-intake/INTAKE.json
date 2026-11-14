@@ -1,0 +1,30 @@
+[
+  {
+    "upstream_repo": "kurigram-org/kurigram",
+    "head_sha": "27c86005a72d0aa6082c46cb04ccb0a80bd5c25c",
+    "file": "pyrogram/crypto/aes.py",
+    "function": "ige",
+    "native_test_cmd": "python3 -m pytest tests/unit/session/test_session.py",
+    "metric_kind": "peak_memory_bytes",
+    "baseline_value": 10072926,
+    "baseline_noise_pct": 0.0006,
+    "metric_benchmark": "python3 osspr-intake/harness/ige-peak/bench.py",
+    "labeled_data": null,
+    "tests_pass_on_baseline": true,
+    "workload": "One 1 MiB upload.GetFile chunk, the size Client.get_file requests, decrypted with AES-256-IGE.",
+    "notes": "With no kuricrypt or tgcrypto installed, every MTProto payload is decrypted by ige, including each 1 MiB chunk Client.get_file asks upload.GetFile for. ige copies the chunk into a list of 16-byte bytes objects and keeps that list until b''.join. tracemalloc peak for one decrypt is 10072926 bytes; the seven samples span 56 bytes. A decrypt that writes blocks into one bytearray and returns that buffer peaks near 2.1 MiB on the same chunk, about 7.6 MiB lower, and returns the same plaintext. tests/unit/session/test_session.py calls ige256_encrypt and ige256_decrypt, which call ige on this fallback (14 calls in that run)."
+  },
+  {
+    "upstream_repo": "kurigram-org/kurigram",
+    "head_sha": "27c86005a72d0aa6082c46cb04ccb0a80bd5c25c",
+    "file": "pyrogram/utils/crypto.py",
+    "function": "xor",
+    "native_test_cmd": "python3 -m pytest tests/unit/session/test_session.py",
+    "bench_cmd": "python3 osspr-intake/harness/xor-chunk/bench.py",
+    "baseline_median_ms": 116.3299,
+    "baseline_noise_pct": 2.8015,
+    "tests_pass_on_baseline": true,
+    "workload": "The 131072 16-byte xors performed while AES-256-IGE decrypts one 1 MiB file chunk.",
+    "notes": "ige calls xor twice per 16-byte block, so one 1 MiB upload.GetFile chunk is 131072 xors. xor builds each result with bytes(i ^ j for i, j in zip(...)), one Python int per byte. Timing only those calls takes 116.3299 ms (full spread 2.8015% over 7 samples). A length-checked word xor via int.from_bytes returns the same bytes for those 16-byte blocks and for empty, 1, 15, 32, and 256-byte inputs, and drops the same batch from about 115 ms to about 32 ms. Patched into ige256_decrypt, the chunk median moved from about 1715 ms to about 1674 ms. The session tests execute this path: 152 xor calls while test_session.py passes."
+  }
+]
